@@ -1,17 +1,17 @@
-# --- Django / Python ---
+# --- Django / Python 
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Ambiente Virtual (O MAIS IMPORTANTE)
+# Ambiente Virtual 
 venv/
 .venv/
 env/
 
-# Banco de Dados (Geralmente não se sobe, gera-se um novo ou usa-se PostgreSQL/MySQL)
+# Banco de Dados 
 db.sqlite3
 
-# Variáveis de Ambiente (Segurança)
+# Variáveis de Ambiente 
 .env
 
 # Pastas de IDE
