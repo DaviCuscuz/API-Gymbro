@@ -1,21 +1,19 @@
-# api/serializers.py
-
 from rest_framework import serializers
-from django.contrib.auth.models import User # <-- O IMPORT QUE FALTOU!
+from django.contrib.auth.models import User
 from django.db import IntegrityError
 from .models import Experimento, UserProfile, Cardio, Exercicio, Ficha, ItemFicha
 
-# --- 1. Serializers de Experimento (Teste Inicial) ---
+# --- 1. Serializers de Experimento (Teste Inicial)
 class ExperimentoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Experimento
         fields = '__all__'
 
-# --- 2. Serializers de Autenticação (User + Profile) ---
+# --- 2. Serializers de Autenticação (User + Profile) 
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['id', 'email', 'nome_completo', 'endereco', 'cidade', 'estado', 'telefone', 'cpf']
+        fields = ['id', 'email', 'nome_completo', 'endereco', 'cidade', 'estado', 'telefone', 'cpf', 'altura', 'peso']
 
 class UserSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer()
@@ -73,22 +71,27 @@ class ExercicioSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_by'] 
 
 class ItemFichaSerializer(serializers.ModelSerializer):
-    # Leitura: Mostra os detalhes completos do exercício
+    # LEITURA: Mostra os detalhes bonitinhos do exercício (Nome, Grupo)
     exercicio_detalhes = ExercicioSerializer(source='exercicio', read_only=True)
-    
-    # Escrita: Recebe apenas o ID do exercício
     exercicio_id = serializers.PrimaryKeyRelatedField(
-        queryset=Exercicio.objects.all(), 
-        source='exercicio', 
-        write_only=True
+        queryset=Exercicio.objects.all(), source='exercicio', write_only=True
+    )
+    ficha_id = serializers.PrimaryKeyRelatedField(
+        queryset=Ficha.objects.all(), source='ficha', write_only=True
     )
 
     class Meta:
         model = ItemFicha
         fields = [
-            'id', 'exercicio_id', 'exercicio_detalhes', 
-            'sets', 'repetitions', 'tempo_segundos', 
-            'peso_adicional_kg', 'order'
+            'id', 
+            'ficha_id',          
+            'exercicio_id',      
+            'exercicio_detalhes',
+            'sets', 
+            'repetitions', 
+            'tempo_segundos', 
+            'peso_adicional_kg', 
+            'order'
         ]
 
 class FichaSerializer(serializers.ModelSerializer):

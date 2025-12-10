@@ -1,29 +1,83 @@
+from rest_framework import viewsets, permissions, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import permissions, status
-from django.shortcuts import get_object_or_404
-from django.contrib.auth import authenticate, login
-from rest_framework.authtoken.models import Token
-from django.db import IntegrityError 
+from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.db.models import Q
-from .models import Experimento, Cardio, Exercicio, Ficha, ItemFicha
-from .serializers import ExperimentoSerializer, UserSerializer, CardioSerializer, ExercicioSerializer, FichaSerializer, ItemFichaSerializer
+from django.shortcuts import get_object_or_404
+from django.contrib.auth.models import User
 
-# --- IMPORTS CRÍTICOS ---
-from rest_framework.decorators import api_view, authentication_classes, permission_classes, renderer_classes
-from rest_framework.authentication import TokenAuthentication, SessionAuthentication
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.renderers import JSONRenderer, BrowsableAPIRenderer
-# ------------------------
+# Importe seus models e serializers
+from .models import Experimento, UserProfile, Cardio, Exercicio, Ficha, ItemFicha
+from .serializers import (
+    ExperimentoSerializer, UserProfileSerializer, CardioSerializer, 
+    ExercicioSerializer, FichaSerializer, ItemFichaSerializer, UserSerializer
+)
 
-# --- VIEWS DE EXPERIMENTO ---
+# --- 1. Autenticação e Cadastro ---
+
+class RegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    permission_classes = (AllowAny,) # Libera pra quem não tem login
+    serializer_class = UserSerializer
+
+class UserProfileViewSet(viewsets.ModelViewSet):
+    serializer_class = UserProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return UserProfile.objects.filter(user=self.request.user)
+        
+    # Rota mágica para o Frontend pegar o perfil sem saber o ID: /api/profiles/me/
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        profile, created = UserProfile.objects.get_or_create(user=request.user)
+        serializer = self.get_serializer(profile)
+        return Response(serializer.data)
+
+# --- 2. Sistema de Treinos (Gymbro) ---
+
+class ExercicioViewSet(viewsets.ModelViewSet):
+    serializer_class = ExercicioSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Retorna: Exercícios do Sistema (created_by=None) OU Exercícios do Próprio Usuário
+        return Exercicio.objects.filter(
+            Q(created_by__isnull=True) | Q(created_by=self.request.user)
+        ).order_by('name')
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+class FichaViewSet(viewsets.ModelViewSet):
+    serializer_class = FichaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Ficha.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+class CardioViewSet(viewsets.ModelViewSet):
+    serializer_class = CardioSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Cardio.objects.filter(usuario=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(usuario=self.request.user)
+
+# --- 3. Experimentos (Legado/Testes) ---
 
 class ExperimentoCreate(APIView):
+    permission_classes = [permissions.IsAuthenticated] # Agora exige login também
     def get(self, request):
         experimentos = Experimento.objects.all()
         serializer = ExperimentoSerializer(experimentos, many=True)
         return Response(serializer.data)
-
     def post(self, request):
         serializer = ExperimentoSerializer(data=request.data)
         if serializer.is_valid():
@@ -32,160 +86,16 @@ class ExperimentoCreate(APIView):
         return Response(serializer.errors)
 
 class ExperimentoDetalhe(APIView):
+    permission_classes = [permissions.IsAuthenticated]
     def get(self, request, pk):
         experimento = get_object_or_404(Experimento, pk=pk)
         serializer = ExperimentoSerializer(experimento)
         return Response(serializer.data)
-
-# --- VIEWS DE AUTENTICAÇÃO ---
-
-class LoginView(APIView):
-    permission_classes = [permissions.AllowAny] 
-
-    def post(self, request, *args, **kwargs):
-        username = request.data.get('username')
-        password = request.data.get('password')
-        
-        user = authenticate(username=username, password=password)
-        
-        if user is not None:
-            login(request, user)
-            token, created = Token.objects.get_or_create(user=user)
-            return Response({
-                'message': 'Autenticação bem-sucedida',
-                'token': token.key 
-            }, status=status.HTTP_200_OK)
-        else:
-            return Response(
-                {'error': 'Credenciais inválidas'}, 
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-
-class RegisterView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request): 
-        user_serializer = UserSerializer(data=request.data)
-        try:
-            if user_serializer.is_valid():
-                user = user_serializer.save() 
-                Token.objects.create(user=user)
-                return Response(
-                    {'message': 'Registro bem-sucedido'}, 
-                    status=status.HTTP_201_CREATED
-                )
-            return Response(
-                {'error': user_serializer.errors}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        except IntegrityError as e:
-            message = f"Erro ao registrar usuário: {e}"
-            return Response(
-                {'error': message}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-@api_view(['GET'])
-@authentication_classes([TokenAuthentication, SessionAuthentication])
-@permission_classes([IsAuthenticated])
-@renderer_classes([JSONRenderer, BrowsableAPIRenderer])
-def api_testar_protecao(request):
-    return Response(
-        {'message': f"Acesso concedido à área protegida. Usuário autenticado: {request.user.username}"}, 
-        status=status.HTTP_200_OK
-    )
-
-# --- VIEWS DE CARDIO (CORRIDA) ---
-
-class CardioListCreate(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        # Filtra cardios do usuário logado
-        cardios = Cardio.objects.filter(usuario=request.user)
-        serializer = CardioSerializer(cardios, many=True)
-        return Response(serializer.data)
-
-    def post(self, request):
-        serializer = CardioSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(usuario=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class CardioDetalhe(APIView):
-    permission_classes = [permissions.IsAuthenticated] 
-
-    def get_object(self, pk, user):
-        return get_object_or_404(Cardio, pk=pk, usuario=user)
-
-    def get(self, request, pk):
-        cardio = self.get_object(pk, request.user)
-        serializer = CardioSerializer(cardio)
-        return Response(serializer.data)
-
-    def put(self, request, pk):
-        cardio = self.get_object(pk, request.user)
-        serializer = CardioSerializer(cardio, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, pk):
-        cardio = self.get_object(pk, request.user)
-        cardio.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
     
-# --- VIEWS DE EXERCÍCIOS (CATÁLOGO + CUSTOM) ---
-
-class ExercicioListCreate(APIView):
+class ItemFichaViewSet(viewsets.ModelViewSet):
+    serializer_class = ItemFichaSerializer
     permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        # Mágica: Traz exercícios que não têm dono (Globais) OU que são do usuário logado
-        exercicios = Exercicio.objects.filter(
-            Q(created_by__isnull=True) | Q(created_by=request.user)
-        )
-        serializer = ExercicioSerializer(exercicios, many=True)
-        return Response(serializer.data)
-
-    def post(self, request):
-        # Cria um exercício novo vinculado ao usuário (Customizado)
-        serializer = ExercicioSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(created_by=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-# --- VIEWS DE FICHA DE TREINO ---
-
-class FichaListCreate(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        fichas = Ficha.objects.filter(user=request.user)
-        serializer = FichaSerializer(fichas, many=True)
-        return Response(serializer.data)
-
-    def post(self, request):
-        serializer = FichaSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(user=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-# View para Adicionar Itens (Exercícios) dentro de uma Ficha
-class ItemFichaCreate(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request, ficha_id):
-        # Verifica se a ficha pertence ao usuário
-        ficha = get_object_or_404(Ficha, pk=ficha_id, user=request.user)
-        
-        serializer = ItemFichaSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(ficha=ficha)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    def get_queryset(self):
+        # Retorna apenas itens das fichas do usuário
+        return ItemFicha.objects.filter(ficha__user=self.request.user)

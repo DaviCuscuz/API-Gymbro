@@ -1,9 +1,7 @@
-# api/models.py
-
 from django.db import models
 from django.contrib.auth.models import User
 
-# --- 1. Experimento, UserProfile, Cardio (Mantidos) ---
+# --- 1. Experimento, UserProfile, Cardio
 class Experimento(models.Model):
     titulo = models.CharField(max_length=100)
     descricao = models.TextField()
@@ -11,15 +9,19 @@ class Experimento(models.Model):
     def __str__(self): return self.titulo
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    email = models.EmailField(max_length=254, unique=True)
-    cpf = models.CharField(max_length=14, unique=True)
-    nome_completo = models.CharField(max_length=100)
-    endereco = models.CharField(max_length=200)
-    cidade = models.CharField(max_length=100)
-    estado = models.CharField(max_length=100)
-    telefone = models.CharField(max_length=20)
-    def __str__(self): return self.user.username
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='userprofile')
+    nome_completo = models.CharField(max_length=255, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    endereco = models.CharField(max_length=255, blank=True, null=True)
+    cidade = models.CharField(max_length=100, blank=True, null=True)
+    estado = models.CharField(max_length=50, blank=True, null=True)
+    telefone = models.CharField(max_length=20, blank=True, null=True)
+    cpf = models.CharField(max_length=14, blank=True, null=True)
+    # Campos de Medidas
+    altura = models.FloatField(null=True, blank=True, help_text="Altura em cm")
+    peso = models.FloatField(null=True, blank=True, help_text="Peso em kg")
+    def __str__(self):
+        return self.user.username
 
 class Cardio(models.Model):
     usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessoes_cardio')
@@ -49,7 +51,7 @@ NIVEL_DIFICULDADE = [
     ('AVANCADO', 'Avançado'), ('EXPERT', 'Expert'),
 ]
 
-# --- 2. Exercicio (Atualizado para Customização) ---
+# --- 2. Exercicio 
 class Exercicio(models.Model):
     # Se created_by for NULL, é Global. Se tiver User, é Customizado.
     created_by = models.ForeignKey(
@@ -61,7 +63,7 @@ class Exercicio(models.Model):
         verbose_name="Criado por (Customizado)"
     )
     
-    name = models.CharField(max_length=100, verbose_name="Nome") # Tirei unique=True global para permitir nomes iguais de users diferentes
+    name = models.CharField(max_length=100, verbose_name="Nome") 
     description = models.TextField(blank=True, verbose_name="Instruções")
     
     tipo_movimento = models.CharField(max_length=20, choices=TIPO_MOVIMENTO, default='EMPURRAR')
@@ -76,7 +78,7 @@ class Exercicio(models.Model):
         verbose_name_plural = "Catálogo de Exercícios"
         ordering = ['name']
 
-# --- 3. Ficha e ItemFicha (Mantidos) ---
+# --- 3. Ficha e ItemFicha
 class Ficha(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Usuário")
     name = models.CharField(max_length=100, verbose_name="Nome da Ficha")

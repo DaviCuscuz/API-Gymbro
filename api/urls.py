@@ -1,26 +1,26 @@
-# api/urls.py
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import (
+    ExercicioViewSet, FichaViewSet, CardioViewSet, UserProfileViewSet, 
+    RegisterView, ExperimentoCreate, ExperimentoDetalhe, ItemFichaViewSet,
+)
 
-from django.urls import path
-from .views import (ExperimentoCreate, ExperimentoDetalhe, CardioListCreate, CardioDetalhe, ExercicioListCreate, FichaListCreate, ItemFichaCreate)
+# O Router cria as rotas padrão automaticamente
+router = DefaultRouter()
+router.register(r'exercicios', ExercicioViewSet, basename='exercicio')
+router.register(r'fichas', FichaViewSet, basename='ficha')
+router.register(r'cardio', CardioViewSet, basename='cardio')
+router.register(r'profiles', UserProfileViewSet, basename='profile')
+router.register(r'itens_ficha', ItemFichaViewSet, basename='item_ficha')
 
 urlpatterns = [
-    # --- EXPERIMENTOS (Legado/Teste) ---
+    # Rotas do Router (Isso aqui gera /api/exercicios/, /api/fichas/, etc.)
+    path('', include(router.urls)),
+    
+    # Rota de Cadastro
+    path('registrar/', RegisterView.as_view(), name='auth_register'),
+    
+    # Rotas Antigas (Experimentos)
     path('experimentos/', ExperimentoCreate.as_view(), name='experimento-create'),
     path('experimentos/<int:pk>/', ExperimentoDetalhe.as_view(), name='experimento-detalhe'),
-    
-    # --- CARDIO (Corridas com GPS) ---
-    path('cardios/', CardioListCreate.as_view(), name='cardio-list-create'),
-    path('cardios/<int:pk>/', CardioDetalhe.as_view(), name='cardio-detalhe'),
-
-    # --- EXERCÍCIOS (Catálogo Global + Customizados) ---
-    # GET: Lista todos (globais + meus). POST: Cria um customizado.
-    path('exercicios/', ExercicioListCreate.as_view(), name='exercicio-list-create'),
-    
-    # --- FICHAS DE TREINO ---
-    # GET: Lista minhas fichas. POST: Cria nova ficha.
-    path('fichas/', FichaListCreate.as_view(), name='ficha-list-create'),
-    
-    # --- ITENS DA FICHA (Montagem do Treino) ---
-    # POST: Adiciona um exercício dentro de uma ficha específica
-    path('fichas/<int:ficha_id>/itens/', ItemFichaCreate.as_view(), name='item-ficha-create'),
 ]

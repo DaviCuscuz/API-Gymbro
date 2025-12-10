@@ -1,0 +1,23 @@
+# --- Django / Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambiente Virtual (O MAIS IMPORTANTE)
+venv/
+.venv/
+env/
+
+# Banco de Dados (Geralmente não se sobe, gera-se um novo ou usa-se PostgreSQL/MySQL)
+db.sqlite3
+
+# Variáveis de Ambiente (Segurança)
+.env
+
+# Pastas de IDE
+.idea/
+.vscode/
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.dbm 
