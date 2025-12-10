@@ -56,9 +56,11 @@ Bash
 
     python manage.py runserver
 
-👨‍💻 Squad de Desenvolvimento
-Nome	Cargo
-Davi	Full Stack Developer
-Thiago Ribeiro	Back-end Developer
-João Rafael	Front-end Developer
-André	QA / Tester
+## 👨‍💻 Squad de Desenvolvimento
+
+🚀 **O Time que fez acontecer:**
+
+* 🦁 **Davi** — *Full Stack Developer*
+* 🎨 **João Rafael** — *Front-end Developer*
+* ⚙️ **Thiago Ribeiro** — *Back-end Developer*
+* 🐛 **André** — *QA / Tester*
