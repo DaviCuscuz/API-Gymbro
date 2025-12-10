@@ -42,6 +42,16 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',            
 ]
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',  # <--- Habilita o uso de Tokens
+        'rest_framework.authentication.SessionAuthentication', # (Opcional) Mantém o login pelo Admin funcionando
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated', # (Opcional) Tranca tudo por padrão (cuidado!)
+    ]
+}
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
