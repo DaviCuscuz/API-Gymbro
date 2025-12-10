@@ -1,66 +1,51 @@
-from rest_framework import serializers
-from .models import Experimento, UserProfile, Cardio 
-from django.contrib.auth.models import User
-from django.db import IntegrityError 
+# api/serializers.py
 
-# Seu Serializer original
+from rest_framework import serializers
+from django.contrib.auth.models import User # <-- O IMPORT QUE FALTOU!
+from django.db import IntegrityError
+from .models import Experimento, UserProfile, Cardio, Exercicio, Ficha, ItemFicha
+
+# --- 1. Serializers de Experimento (Teste Inicial) ---
 class ExperimentoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Experimento
-        fields = '__all__' 
+        fields = '__all__'
 
-# 1. Serializer para o modelo de perfil de usuário (Conforme PDF, pág. 33)
+# --- 2. Serializers de Autenticação (User + Profile) ---
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        # Campos que o Front-end deve enviar para o perfil
         fields = ['id', 'email', 'nome_completo', 'endereco', 'cidade', 'estado', 'telefone', 'cpf']
 
-# 2. Serializer principal (aninhado) com lógica de criação (Conforme PDF, pág. 34)
 class UserSerializer(serializers.ModelSerializer):
-    # Relaciona o UserProfileSerializer como um campo aninhado 'profile'
-    profile = UserProfileSerializer() 
+    profile = UserProfileSerializer()
 
     class Meta:
         model = User
         fields = ['id', 'username', 'password', 'profile']
-        # Garante que a senha seja 'write_only', nunca retornada em um GET
-        extra_kwargs = {'password': {'write_only': True}} 
+        extra_kwargs = {'password': {'write_only': True}}
 
-    # Sobrescreve o método 'create' para tratar a senha e o perfil
     def create(self, validated_data):
         profile_data = validated_data.pop('profile')
         password = validated_data.pop('password', None)
         
         try:
-            # Cria o usuário padrão do Django
             user = User.objects.create(**validated_data)
-            
-            # Se houver senha, salva ela criptografada (set_password é crucial)
             if password:
                 user.set_password(password)
                 user.save()
-
-            # Cria a instância do UserProfile, vinculando ao novo usuário
             UserProfile.objects.create(user=user, **profile_data)
             return user
-            
         except IntegrityError as e:
-            # Lança um erro de validação caso algo dê errado no banco (ex: username duplicado)
-            message = f"Erro ao registrar usuário: {e}"
-            raise serializers.ValidationError(message)
-    
-    # O método 'update' (pág. 35 do PDF) para editar o usuário/perfil
+            raise serializers.ValidationError(f"Erro ao registrar usuário: {e}")
+
     def update(self, instance, validated_data):
         profile_data = validated_data.pop('profile', {})
-        # O nome do atributo é 'userprofile' por ser um OneToOneField no UserProfile
-        profile_instance = instance.userprofile 
+        profile_instance = instance.userprofile
         
-        # Atualiza campos do User
         instance.username = validated_data.get('username', instance.username)
         instance.save()
         
-        # Atualiza campos do UserProfile (pág. 35 do PDF)
         profile_instance.email = profile_data.get('email', profile_instance.email)
         profile_instance.nome_completo = profile_data.get('nome_completo', profile_instance.nome_completo)
         profile_instance.endereco = profile_data.get('endereco', profile_instance.endereco)
@@ -69,12 +54,48 @@ class UserSerializer(serializers.ModelSerializer):
         profile_instance.telefone = profile_data.get('telefone', profile_instance.telefone)
         profile_instance.cpf = profile_data.get('cpf', profile_instance.cpf)
         profile_instance.save()
-
         return instance
 
+# --- 3. Serializer de Cardio (Corrida) ---
 class CardioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cardio
         fields = '__all__'
-        # O campo usuario será preenchido automaticamente pela View usando o Token
         read_only_fields = ['usuario']
+
+# --- 4. Serializers de Treino (Exercicio, Ficha, Item) ---
+
+class ExercicioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Exercicio
+        fields = '__all__'
+        # O usuário não envia 'created_by', o backend preenche automaticamente
+        read_only_fields = ['created_by'] 
+
+class ItemFichaSerializer(serializers.ModelSerializer):
+    # Leitura: Mostra os detalhes completos do exercício
+    exercicio_detalhes = ExercicioSerializer(source='exercicio', read_only=True)
+    
+    # Escrita: Recebe apenas o ID do exercício
+    exercicio_id = serializers.PrimaryKeyRelatedField(
+        queryset=Exercicio.objects.all(), 
+        source='exercicio', 
+        write_only=True
+    )
+
+    class Meta:
+        model = ItemFicha
+        fields = [
+            'id', 'exercicio_id', 'exercicio_detalhes', 
+            'sets', 'repetitions', 'tempo_segundos', 
+            'peso_adicional_kg', 'order'
+        ]
+
+class FichaSerializer(serializers.ModelSerializer):
+    # Nested Serializer: Traz a lista de itens dentro da ficha
+    items = ItemFichaSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Ficha
+        fields = ['id', 'name', 'is_active', 'created_at', 'items']
+        read_only_fields = ['user']

@@ -1,14 +1,13 @@
-# api/views.py
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate, login
 from rest_framework.authtoken.models import Token
-from django.db import IntegrityError
-from .models import Experimento, Cardio
-from .serializers import ExperimentoSerializer, UserSerializer, CardioSerializer
+from django.db import IntegrityError 
+from django.db.models import Q
+from .models import Experimento, Cardio, Exercicio, Ficha, ItemFicha
+from .serializers import ExperimentoSerializer, UserSerializer, CardioSerializer, ExercicioSerializer, FichaSerializer, ItemFichaSerializer
 
 # --- IMPORTS CRÍTICOS ---
 from rest_framework.decorators import api_view, authentication_classes, permission_classes, renderer_classes
@@ -137,3 +136,56 @@ class CardioDetalhe(APIView):
         cardio = self.get_object(pk, request.user)
         cardio.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+# --- VIEWS DE EXERCÍCIOS (CATÁLOGO + CUSTOM) ---
+
+class ExercicioListCreate(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        # Mágica: Traz exercícios que não têm dono (Globais) OU que são do usuário logado
+        exercicios = Exercicio.objects.filter(
+            Q(created_by__isnull=True) | Q(created_by=request.user)
+        )
+        serializer = ExercicioSerializer(exercicios, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        # Cria um exercício novo vinculado ao usuário (Customizado)
+        serializer = ExercicioSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(created_by=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# --- VIEWS DE FICHA DE TREINO ---
+
+class FichaListCreate(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        fichas = Ficha.objects.filter(user=request.user)
+        serializer = FichaSerializer(fichas, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = FichaSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# View para Adicionar Itens (Exercícios) dentro de uma Ficha
+class ItemFichaCreate(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, ficha_id):
+        # Verifica se a ficha pertence ao usuário
+        ficha = get_object_or_404(Ficha, pk=ficha_id, user=request.user)
+        
+        serializer = ItemFichaSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(ficha=ficha)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
