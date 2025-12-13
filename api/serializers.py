@@ -67,11 +67,9 @@ class ExercicioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Exercicio
         fields = '__all__'
-        # O usuário não envia 'created_by', o backend preenche automaticamente
         read_only_fields = ['created_by'] 
 
 class ItemFichaSerializer(serializers.ModelSerializer):
-    # LEITURA: Mostra os detalhes bonitinhos do exercício (Nome, Grupo)
     exercicio_detalhes = ExercicioSerializer(source='exercicio', read_only=True)
     exercicio_id = serializers.PrimaryKeyRelatedField(
         queryset=Exercicio.objects.all(), source='exercicio', write_only=True
@@ -95,10 +93,37 @@ class ItemFichaSerializer(serializers.ModelSerializer):
         ]
 
 class FichaSerializer(serializers.ModelSerializer):
-    # Nested Serializer: Traz a lista de itens dentro da ficha
     items = ItemFichaSerializer(many=True, read_only=True)
 
     class Meta:
         model = Ficha
         fields = ['id', 'name', 'is_active', 'created_at', 'items']
         read_only_fields = ['user']
+
+class RegisterSerializer(serializers.ModelSerializer):
+    # Definimos explicitamente para aceitar 'email' e 'password' no nível raiz
+    email = serializers.EmailField(required=False)
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'password']
+
+    def create(self, validated_data):
+        # 1. Separa os dados
+        email = validated_data.get('email', '')
+        username = validated_data['username']
+        password = validated_data['password']
+
+        # 2. Cria o Usuário (com senha criptografada)
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password
+        )
+
+        # 3. Cria o Perfil automaticamente (Já que removemos os signals)
+        # Repassamos o email para o perfil também
+        UserProfile.objects.create(user=user, email=email)
+
+        return user

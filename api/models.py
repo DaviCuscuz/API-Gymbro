@@ -17,7 +17,6 @@ class UserProfile(models.Model):
     estado = models.CharField(max_length=50, blank=True, null=True)
     telefone = models.CharField(max_length=20, blank=True, null=True)
     cpf = models.CharField(max_length=14, blank=True, null=True)
-    # Campos de Medidas
     altura = models.FloatField(null=True, blank=True, help_text="Altura em cm")
     peso = models.FloatField(null=True, blank=True, help_text="Peso em kg")
     def __str__(self):
@@ -40,7 +39,6 @@ class Cardio(models.Model):
             return self.velocidade_media
         return 0
 
-# --- CONSTANTES ---
 TIPO_MOVIMENTO = [
     ('EMPURRAR', 'Empurrar'), ('PUXAR', 'Puxar'),
     ('INFERIOR', 'Inferior (Pernas)'), ('CORE', 'Core'),
@@ -51,7 +49,6 @@ NIVEL_DIFICULDADE = [
     ('AVANCADO', 'Avançado'), ('EXPERT', 'Expert'),
 ]
 
-# --- 2. Exercicio 
 class Exercicio(models.Model):
     # Se created_by for NULL, é Global. Se tiver User, é Customizado.
     created_by = models.ForeignKey(
@@ -78,7 +75,6 @@ class Exercicio(models.Model):
         verbose_name_plural = "Catálogo de Exercícios"
         ordering = ['name']
 
-# --- 3. Ficha e ItemFicha
 class Ficha(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Usuário")
     name = models.CharField(max_length=100, verbose_name="Nome da Ficha")

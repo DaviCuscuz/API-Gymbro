@@ -6,12 +6,10 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
-
-# Importe seus models e serializers
 from .models import Experimento, UserProfile, Cardio, Exercicio, Ficha, ItemFicha
 from .serializers import (
     ExperimentoSerializer, UserProfileSerializer, CardioSerializer, 
-    ExercicioSerializer, FichaSerializer, ItemFichaSerializer, UserSerializer
+    ExercicioSerializer, FichaSerializer, ItemFichaSerializer, RegisterSerializer
 )
 
 # --- 1. Autenticação e Cadastro ---
@@ -19,7 +17,7 @@ from .serializers import (
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = (AllowAny,) # Libera pra quem não tem login
-    serializer_class = UserSerializer
+    serializer_class = RegisterSerializer
 
 class UserProfileViewSet(viewsets.ModelViewSet):
     serializer_class = UserProfileSerializer
@@ -28,14 +26,12 @@ class UserProfileViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return UserProfile.objects.filter(user=self.request.user)
         
-    # Rota mágica para o Frontend pegar o perfil sem saber o ID: /api/profiles/me/
     @action(detail=False, methods=['get'])
     def me(self, request):
         profile, created = UserProfile.objects.get_or_create(user=request.user)
         serializer = self.get_serializer(profile)
         return Response(serializer.data)
 
-# --- 2. Sistema de Treinos (Gymbro) ---
 
 class ExercicioViewSet(viewsets.ModelViewSet):
     serializer_class = ExercicioSerializer
@@ -73,7 +69,7 @@ class CardioViewSet(viewsets.ModelViewSet):
 # --- 3. Experimentos (Legado/Testes) ---
 
 class ExperimentoCreate(APIView):
-    permission_classes = [permissions.IsAuthenticated] # Agora exige login também
+    permission_classes = [permissions.IsAuthenticated] 
     def get(self, request):
         experimentos = Experimento.objects.all()
         serializer = ExperimentoSerializer(experimentos, many=True)
@@ -97,5 +93,4 @@ class ItemFichaViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        # Retorna apenas itens das fichas do usuário
         return ItemFicha.objects.filter(ficha__user=self.request.user)
